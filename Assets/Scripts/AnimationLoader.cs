@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
 
 // Loads animations from files and returns a built legacy AnimationClip
@@ -36,11 +37,19 @@ public class AnimationLoader
             reconstructedCurves.Add(obj.name + ".Qw", new AnimationCurve());
         }
 
-        // TODO: decompress whatever is given first
+        // Open the file, which contains compressed data
         FileStream animFile = new FileStream(Path.Combine(Application.streamingAssetsPath, relPath + ".anim"), FileMode.Open);
+
+        // Decompress that data and deserialze it
+        byte[] buffer = new byte[animFile.Length];
+        animFile.Read(buffer, 0, (int)animFile.Length);
+        MemoryStream compressed = new MemoryStream(buffer);
+        MemoryStream decompressed = new MemoryStream();
+        DeflateStream decompressor = new DeflateStream(compressed, CompressionMode.Decompress);
+        decompressor.CopyTo(decompressed);
         BinaryFormatter bf = new BinaryFormatter();
 
-        Dictionary<string, List<(float, float)>> serializableCurves = (Dictionary<string, List<(float, float)>>)bf.Deserialize(animFile);
+        Dictionary<string, List<(float, float)>> serializableCurves = (Dictionary<string, List<(float, float)>>)bf.Deserialize(decompressed);
 
         // Using similar methods in CreateLegacyAnimClip, recreate the clip
         foreach (KeyValuePair<string, List<(float, float)>> data in serializableCurves)

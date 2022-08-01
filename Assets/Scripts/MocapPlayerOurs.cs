@@ -2,10 +2,14 @@
 using System.Collections.Generic;
 using System;
 using System.IO;
+using System.IO.Compression;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Runtime.Serialization.Formatters.Binary;
+
+// Disambiguate the usage of CompressionLevel
+using CompressionLevel = System.IO.Compression.CompressionLevel;
 
 // Our implementation of the Kinect Mocap Player from the Kinect v2 Examples library
 // Differs greatly in that it uses legacy animations and performs audio loading operations
@@ -196,11 +200,17 @@ public class MocapPlayerOurs : MonoBehaviour
 
         // Currently ignores all root motion, as it is not necessary for evaluation
 
-        // Serialize our data and write it to a file that can be later retrieved
-        // TODO: in-between layer that compresses the serialized data so it isn't absolutely ridiculous in file size
+        // Serialize our data
         BinaryFormatter bf = new BinaryFormatter();
+
+        MemoryStream compressed = new MemoryStream();
+        DeflateStream dstream = new DeflateStream(compressed, CompressionLevel.Optimal);
+        bf.Serialize(dstream, serializableCurves);
+        byte[] compressedBytes = compressed.ToArray();
+
+        // Open the file handle for the target file creation and write the compressed bytes
         FileStream animFile = new FileStream(Path.Combine(Application.streamingAssetsPath, fileName + ".anim"), FileMode.Create);
-        bf.Serialize(animFile, serializableCurves);
+        animFile.Write(compressedBytes, 0, compressedBytes.Length);
         animFile.Close();
 
         // Save the associated audio clip if one exists
